@@ -1,29 +1,30 @@
 import streamlit as st
 import pandas as pd
 from datetime import date
-from streamlit_gsheets import GSheetsConnection
 
 # 페이지 설정
 st.set_page_config(page_title="Heeju's Car ERP", layout="wide")
 
 st.title("🚀 희주님 전용 중고차 정산 ERP")
 
-# 구글 시트 연결 (Secrets 설정이 필요합니다)
-url = "https://docs.google.com/spreadsheets/d/1uoINlUiBRuYHfwMjhIWq3XwF3xzXMa8JX9_H9-yrtGY/edit?usp=sharing"
+# 구글 시트 연동 (가장 안정적인 pandas read 방식)
+url = "https://docs.google.com/spreadsheets/d/1uoINlUiBRuYHfwMjhIWq3XwF3xzXMa8JX9_H9-yrtGY/gviz/tq?tqx=out:csv"
+
+@st.cache_data(ttl=0)
+def load_data():
+    return pd.read_csv(url)
 
 try:
-    conn = st.connection("gsheets", type=GSheetsConnection)
-    df = conn.read(spreadsheet=url, ttl=0)
+    df = load_data()
 except Exception as e:
-    st.error(f"연동 에러 발생: {e}")
-    st.info("Streamlit Cloud의 App Settings -> Secrets에 시트 URL 설정을 확인해주세요.")
+    st.error(f"데이터 로드 실패: {e}")
     st.stop()
 
 tab1, tab2 = st.tabs(["📝 정산서 작성", "📊 판매 히스토리"])
 
 with tab1:
     with st.form("main_form"):
-        # [섹션 1: 차량정보] - 시트 B3~B7 양식
+        # [섹션 1: 차량정보] - 시트 B3~B7 양식 그대로
         st.subheader("📋 차량정보 (B3~B7)")
         col1, col2 = st.columns(2)
         with col1:
@@ -39,7 +40,7 @@ with tab1:
 
         st.divider()
 
-        # [섹션 2: 매매 정보 및 매출내역]
+        # [섹션 2: 매매 및 매출내역]
         st.subheader("💰 매매 및 매출내역")
         c3, c4 = st.columns(2)
         with c3:
@@ -70,8 +71,7 @@ with tab1:
             d19_delivery = st.number_input("D19. 탁송료", value=150000)
             auto_d22 = int(b9_buy_price * 0.0105) if b9_buy_price >= 28500001 else 0
             d22_reg = st.number_input("D22. 매입등록비용", value=auto_d22)
-            d28_val = b29_sum
-            d30_sum = d19_delivery + d22_reg + d28_val
+            d30_sum = d19_delivery + d22_reg + b29_sum
             st.write(f"**기타비용 합계(D30):** ₩{d30_sum:,}")
 
         b30_fixed = st.number_input("이자 + 주차비 (B30)", value=1000000)
@@ -89,9 +89,9 @@ with tab1:
         res_col1.metric("최종 소득액 (E31)", f"₩{final_profit:,}")
         res_col2.metric("마진율 (F31)", f"{(final_profit/b9_buy_price)*100:.2f}%")
 
-        if st.form_submit_button("✅ 시트에 데이터 누적 저장"):
+        if st.form_submit_button("✅ 정산 완료 (데이터 저장 기능은 설정 후 활성화)"):
             st.balloons()
-            st.success("성공!")
+            st.success("계산 완료! 정산 데이터를 확인하세요.")
 
 with tab2:
     st.subheader("📊 전체 판매 히스토리")
